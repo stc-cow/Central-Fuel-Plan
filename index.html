@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>COW Fuel Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+    <div class="dashboard-container">
+
+        <!-- KPI Cards -->
+        <div class="cards">
+            <div class="card" id="totalSites">
+                <h3>Total Sites With Date</h3>
+                <p class="value">0</p>
+            </div>
+
+            <div class="card" id="needFuelToday">
+                <h3>Fuel Needed Today</h3>
+                <p class="value">0</p>
+            </div>
+
+            <div class="card" id="tomorrowFuel">
+                <h3>Tomorrow</h3>
+                <p class="value">0</p>
+            </div>
+
+            <div class="card" id="afterTomorrowFuel">
+                <h3>After Tomorrow</h3>
+                <p class="value">0</p>
+            </div>
+        </div>
+
+        <!-- MAP -->
+        <div id="map"></div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

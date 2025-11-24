@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+.env
+fuel_today.csv
+fuel_pending.csv
