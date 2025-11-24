@@ -1,6 +1,6 @@
 # Central Fuel Plan Dashboard
 
-This repo fetches the Central Fuel Plan Google Sheet, generates fuel status reports, and renders a Leaflet-based dashboard. Only sites in the **Central** region (Column D) are included in the outputs.
+This repo fetches the Central Fuel Plan Google Sheet, generates fuel status reports, and renders a Leaflet-based dashboard.
 
 ## Setup
 1. Install dependencies:
