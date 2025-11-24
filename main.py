@@ -5,18 +5,15 @@ from typing import List
 
 import pandas as pd
 
-# Google Sheet CSV link
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0GkXnQMdKYZITuuMsAzeWDtGUqEJ3lWwqNdA67NewOsDOgqsZHKHECEEkea4nrukx4-DqxKmf62nC/pub?gid=1149576218&single=true&output=csv"
-LOCAL_FALLBACK = os.getenv("SHEET_LOCAL_PATH", "sheet_cache.csv")
-
+CSV_URL = ("https://docs.google.com/spreadsheets/d/e/"
+           "2PACX-1vS0GkXnQMdKYZITuuMsAzeWDtGUqEJ3lWwqNdA67NewOsDOgqsZHKHECEEkea4nrukx4-DqxKmf62nC"
+           "/pub?gid=1149576218&output=csv")
 
 def load_data() -> pd.DataFrame:
-    """
-    Load the Google Sheet as a DataFrame.
+    print(f"Loading data from remote Google Sheet: {CSV_URL}")
+    df = pd.read_csv(CSV_URL)
+    return df
 
-    Falls back to a local CSV (sheet_cache.csv by default or SHEET_LOCAL_PATH env var)
-    when remote access is blocked.
-    """
 
     try:
         return pd.read_csv(SHEET_URL)
