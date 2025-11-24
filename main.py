@@ -1,9 +1,8 @@
 import json
+import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
-
 from typing import Optional
-import pandas as pd
 
 # -------------------------------------------------------
 # CONFIG
@@ -21,27 +20,20 @@ CACHE_PATH = Path("sheet_cache.csv")
 # SAFE DATE PARSER
 # -------------------------------------------------------
 def safe_parse_date(value) -> Optional[datetime]:
-    """
-    Convert messy AJ values to datetime or return None.
+    """Convert messy Google-Sheet values to datetime or None."""
 
-    Handles:
-      - text like 10-11-2025, 11-23-2025, 2025-11-24
-      - 23-Nov-2025 / 23 Nov 2025
-      - Excel / Google serial numbers (e.g. 45640)
-      - ignores #N/A, #DIV/0!, empty, etc.
-    """
     if value is None:
         return None
 
-    # Google/Excel serial numbers
+    # Excel/Google numeric serial dates
     if isinstance(value, (int, float)) and not pd.isna(value):
-        # Excel epoch 1899-12-30
         try:
             base = datetime(1899, 12, 30)
             return base + timedelta(days=float(value))
-        except Exception:
+        except:
             return None
 
+    # Convert to string
     if not isinstance(value, str):
         value = str(value)
 
@@ -49,7 +41,7 @@ def safe_parse_date(value) -> Optional[datetime]:
     if value == "" or value.upper() in {"#N/A", "#DIV/0!", "#VALUE!"}:
         return None
 
-    # try a few common formats
+    # Formats to test
     formats = [
         "%Y-%m-%d",
         "%d-%m-%Y",
@@ -63,16 +55,16 @@ def safe_parse_date(value) -> Optional[datetime]:
     for fmt in formats:
         try:
             return datetime.strptime(value, fmt)
-        except Exception:
-            continue
+        except:
+            pass
 
-    # final attempt: let pandas try
+    # Final fallback
     try:
         dt = pd.to_datetime(value, errors="raise")
         if isinstance(dt, pd.Timestamp):
             return dt.to_pydatetime()
-    except Exception:
-        pass
+    except:
+        return None
 
     return None
 
@@ -81,16 +73,16 @@ def safe_parse_date(value) -> Optional[datetime]:
 # LOAD SHEET
 # -------------------------------------------------------
 def load_data() -> pd.DataFrame:
-    print(f"[INFO] Loading sheet from: {SHEET_URL}")
+    print(f"[INFO] Loading sheet: {SHEET_URL}")
     try:
         df = pd.read_csv(SHEET_URL)
-        df.to_csv(CACHE_PATH, index=False)  # refresh local cache
+        df.to_csv(CACHE_PATH, index=False)
         print(f"[OK] Loaded live sheet: {len(df)} rows")
         return df
     except Exception as exc:
-        print(f"[WARN] Live sheet failed ({exc}). Trying local cache: {CACHE_PATH}")
+        print(f"[WARN] Live sheet failed ({exc}), loading cache")
         if not CACHE_PATH.exists():
-            raise FileNotFoundError(f"Cache not found at {CACHE_PATH}") from exc
+            raise
         df = pd.read_csv(CACHE_PATH)
         print(f"[OK] Loaded cache: {len(df)} rows")
         return df
@@ -100,104 +92,78 @@ def load_data() -> pd.DataFrame:
 # CLEAN & FILTER
 # -------------------------------------------------------
 def clean_and_filter(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply project rules:
+    """Apply all project rules."""
+    print("[INFO] Normalising columns…")
 
-    - Region = Central only
-    - COWStatus ∈ {ON-AIR, IN PROGRESS}
-    - NextFuelingPlan must be a valid date
-    - Keep lat/lng so we can show on the map
-    """
-
-    # Normalise column names (but we know the exact ones from your sheet)
     original_cols = df.columns.tolist()
     df.columns = (
         pd.Index(df.columns)
         .astype(str)
         .str.strip()
         .str.lower()
-        .str.replace(" ", "", regex=False)
+        .str.replace(" ", "")
     )
 
-    # Map to expected names
-    site_col = "sitename"          # B
-    region_col = "regionnam"       # D
-    status_col = "cowstatus"       # J
-    date_col = "nextfuelingplan"   # AJ
-    lat_col = "lat"                # L
-    lng_col = "lng"                # M
-
-    print("[INFO] Original columns:", original_cols)
     print("[INFO] Normalised columns:", list(df.columns))
 
-    total_rows = len(df)
-    print(f"[STEP] Raw rows: {total_rows}")
+    site_col = "sitename"         # Column B
+    region_col = "regionnam"      # Column D
+    status_col = "cowstatus"      # Column J
+    date_col = "nextfuelingplan"  # Column AJ
+    lat_col = "lat"               # Column L
+    lng_col = "lng"               # Column M
 
-    # Region = Central
+    # 1️⃣ Region = Central
     df[region_col] = df[region_col].astype(str)
-    mask_region = df[region_col].str.strip().str.lower() == "central"
-    df = df.loc[mask_region]
-    print(f"[STEP] After region == Central: {len(df)} rows")
+    df = df[df[region_col].str.strip().str.lower() == "central"]
+    print(f"[STEP] After region filter: {len(df)}")
 
-    # Status = ON-AIR or IN PROGRESS
-    df[status_col] = df[status_col].astype(str).str.strip().str.upper()
+    # 2️⃣ Status = ON-AIR or IN PROGRESS
+    df[status_col] = df[status_col].astype(str).str.upper().str.strip()
     df = df[df[status_col].isin(["ON-AIR", "IN PROGRESS"])]
-    print(f"[STEP] After status filter (ON-AIR / IN PROGRESS): {len(df)} rows")
+    print(f"[STEP] After status filter: {len(df)}")
 
-    # Parse dates
-    print("[INFO] Parsing NextFuelingPlan (AJ) ...")
+    # 3️⃣ Clean AJ date column
+    print("[INFO] Parsing NextFuelingPlan…")
     df["parsed_date"] = df[date_col].apply(safe_parse_date)
-    before_dates = len(df)
+    before = len(df)
     df = df.dropna(subset=["parsed_date"])
-    print(f"[STEP] After dropping invalid dates: {len(df)} rows (removed {before_dates - len(df)})")
+    print(f"[STEP] After removing invalid dates: {len(df)} (removed {before-len(df)})")
 
-    # Ensure datetime64[ns] for JSON export / filtering later
     df["parsed_date"] = pd.to_datetime(df["parsed_date"])
 
-    # Keep only rows with coordinates
+    # 4️⃣ Coordinates
     df["lat"] = pd.to_numeric(df[lat_col], errors="coerce")
     df["lng"] = pd.to_numeric(df[lng_col], errors="coerce")
-    before_coords = len(df)
+    before = len(df)
     df = df.dropna(subset=["lat", "lng"])
-    print(f"[STEP] After dropping missing lat/lng: {len(df)} rows (removed {before_coords - len(df)})")
+    print(f"[STEP] After removing missing coordinates: {len(df)} (removed {before-len(df)})")
 
-    # Build clean dataframe for dashboard
-    clean = pd.DataFrame(
-        {
-            "SiteName": df[site_col].astype(str).str.strip(),
-            "Region": df[region_col].astype(str).str.strip(),
-            "COWStatus": df[status_col],
-            "NextFuelingPlan": df["parsed_date"],
-            "lat": df["lat"],
-            "lng": df["lng"],
-        }
-    )
+    # Build final table
+    clean = pd.DataFrame({
+        "SiteName": df[site_col].astype(str).strip(),
+        "Region": df[region_col],
+        "COWStatus": df[status_col],
+        "NextFuelingPlan": df["parsed_date"],
+        "lat": df["lat"],
+        "lng": df["lng"]
+    })
 
-    print(f"[OK] Clean dataset size (Central + ON-AIR/IN PROGRESS + valid date + coords): {len(clean)}")
+    print(f"[OK] Clean dataset ready: {len(clean)} rows")
     return clean
 
 
 # -------------------------------------------------------
 # EXPORT JSON FOR DASHBOARD
 # -------------------------------------------------------
-def generate_dashboard(df: pd.DataFrame) -> None:
-    """
-    Export all eligible sites for the front-end dashboard.
-
-    JS will:
-      - count Total Sites = len(data.json)
-      - split into Due/Today/Tomorrow/After Tomorrow
-      - colour markers accordingly (red / yellow / orange / green)
-    """
+def generate_dashboard(df: pd.DataFrame):
     df = df.copy()
     df["NextFuelingPlan"] = df["NextFuelingPlan"].dt.strftime("%Y-%m-%d")
 
-    records = df.to_dict(orient="records")
-
     with open("data.json", "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+        json.dump(df.to_dict(orient="records"), f, indent=2)
 
-    print(f"[OK] data.json exported with {len(records)} sites")
+    print(f"[OK] data.json exported ({len(df)} sites)")
 
 
 # -------------------------------------------------------
@@ -207,7 +173,7 @@ def main():
     df = load_data()
     clean_df = clean_and_filter(df)
     generate_dashboard(clean_df)
-    print("[OK] Pipeline completed successfully.")
+    print("[OK] Completed successfully")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
 __pycache__/
+<<<<<<< HEAD
 *.py[cod]
 .env
 fuel_today.csv
 fuel_pending.csv
+=======
+>>>>>>> abd64e8 (Updated main.py: added auto-detection, fixed date parsing, and generated fuel reports)
