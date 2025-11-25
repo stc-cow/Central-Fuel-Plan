@@ -1,48 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>COW Fuel Dashboard</title>
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <title>Central Fuel Plan Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Leaflet Map Library -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
+  <div class="dashboard">
 
-    <div class="dashboard-container">
-
-        <!-- KPI Cards -->
-        <div class="cards">
-            <div class="card" id="totalSites">
-                <h3>Total Sites With Date</h3>
-                <p class="value">0</p>
-            </div>
-
-            <div class="card" id="needFuelToday">
-                <h3>Fuel Needed Today</h3>
-                <p class="value">0</p>
-            </div>
-
-            <div class="card" id="tomorrowFuel">
-                <h3>Tomorrow</h3>
-                <p class="value">0</p>
-            </div>
-
-            <div class="card" id="afterTomorrowFuel">
-                <h3>After Tomorrow</h3>
-                <p class="value">0</p>
-            </div>
+    <!-- Top header with cards + ACES logo -->
+    <header class="dashboard-header">
+      <div class="header-row">
+        <div class="metric-cards">
+          <div class="metric-card">
+            <div class="metric-label">Total Sites With Date</div>
+            <div id="metric-total" class="metric-value">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Fuel Needed Today</div>
+            <div id="metric-today" class="metric-value">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Tomorrow</div>
+            <div id="metric-tomorrow" class="metric-value">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">After Tomorrow</div>
+            <div id="metric-after" class="metric-value">0</div>
+          </div>
         </div>
 
-        <!-- MAP -->
-        <div id="map"></div>
+        <!-- ACES logo centered under the cards on desktop, stacked on mobile -->
+        <div class="aces-logo-wrapper">
+          <img src="assets/aces-logo.png" alt="ACES Managed Services" class="aces-logo" />
+        </div>
+      </div>
+    </header>
 
-    </div>
+    <!-- Main content: Map + side list -->
+    <main class="dashboard-main">
+      <div id="map"></div>
 
-    <script src="script.js"></script>
+      <aside class="side-panel">
+        <h2>Today & Due Sites</h2>
+        <p class="side-panel-subtitle">
+          Sites with fuel date today or already overdue.
+        </p>
+        <ul id="due-list" class="site-list"></ul>
+
+        <div class="legend">
+          <h3>Fuel Status Legend</h3>
+          <div class="legend-item">
+            <span class="legend-dot legend-green"></span> &gt; 3 days remaining (Safe)
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-yellow"></span> 1–3 days remaining (Warning)
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot legend-red"></span> Today / overdue (Due)
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script src="script.js"></script>
 </body>
 </html>

@@ -1,97 +1,197 @@
-// Load dataset for dashboard KPIs and map
-fetch('data.json')
-  .then((res) => res.json())
-  .then((data) => buildDashboard(data))
-  .catch((err) => {
-    console.error('Failed to load data.json', err);
-  });
+// Approximate bounds for Saudi Arabia: [southWest, northEast]
+const SAUDI_BOUNDS = [
+  [16.0, 34.0],
+  [33.5, 56.0],
+];
 
-function buildDashboard(data) {
-  const cleaned = data
-    .map((d) => ({
-      ...d,
-      date: new Date(d.NextFuelingPlan),
-    }))
-    .filter((d) => !isNaN(d.date));
+// Base map
+const map = L.map("map", {
+  maxBounds: SAUDI_BOUNDS,
+  maxBoundsViscosity: 0.7,
+}).setView([23.8859, 45.0792], 5.4);
 
-  const today = startOfDay(new Date());
-  const tomorrow = addDays(today, 1);
-  const afterTomorrow = addDays(today, 2);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors",
+  minZoom: 4,
+  maxZoom: 12,
+}).addTo(map);
 
-  document
-    .getElementById('totalSites')
-    .querySelector('.value').textContent = cleaned.length;
+const COLOR_GREEN = "#1bbf72";
+const COLOR_YELLOW = "#ffc857";
+const COLOR_RED = "#ff4b4b";
 
-  const todayList = cleaned.filter((d) => isSameDay(d.date, today));
-  document
-    .getElementById('needFuelToday')
-    .querySelector('.value').textContent = todayList.length;
+// Helpers
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-  const tomorrowList = cleaned.filter((d) => isSameDay(d.date, tomorrow));
-  document
-    .getElementById('tomorrowFuel')
-    .querySelector('.value').textContent = tomorrowList.length;
-
-  const afterTomorrowList = cleaned.filter((d) => isSameDay(d.date, afterTomorrow));
-  document
-    .getElementById('afterTomorrowFuel')
-    .querySelector('.value').textContent = afterTomorrowList.length;
-
-  buildMap(cleaned, today, tomorrow, afterTomorrow);
+function parseDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 }
 
-function buildMap(data, today, tomorrow, afterTomorrow) {
-  const map = L.map('map').setView([23.8859, 45.0792], 6);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-  }).addTo(map);
-
-  data.forEach((site) => {
-    if (!isValidCoordinate(site.lat) || !isValidCoordinate(site.lng)) {
-      return;
-    }
-
-    let color = '#2E7D32'; // green - normal
-
-    if (site.date < today) {
-      color = '#C62828'; // red - overdue
-    } else if (isSameDay(site.date, today)) {
-      color = '#C62828'; // red - today
-    } else if (isSameDay(site.date, tomorrow)) {
-      color = '#FB8C00'; // orange - tomorrow
-    } else if (isSameDay(site.date, afterTomorrow)) {
-      color = '#FBC02D'; // yellow - after tomorrow
-    }
-
-    L.circleMarker([site.lat, site.lng], {
-      radius: 8,
-      fillColor: color,
-      color,
-      weight: 1,
-      fillOpacity: 0.7,
-    })
-      .bindPopup(`<b>${site.SiteName}</b><br>${site.CityName}<br>${site.NextFuelingPlan}`)
-      .addTo(map);
-  });
-}
-
-function isSameDay(a, b) {
-  return a.toDateString() === b.toDateString();
-}
-
-function startOfDay(date) {
+function daysDiffFromToday(date) {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  return d;
+  return Math.round((d - today) / ONE_DAY_MS);
 }
 
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+function getStatus(days) {
+  if (days === null) return { status: "unknown", color: COLOR_GREEN };
+  if (days <= 0) return { status: "due", color: COLOR_RED }; // today or overdue
+  if (days <= 3) return { status: "warning", color: COLOR_YELLOW }; // 1-3 days
+  return { status: "ok", color: COLOR_GREEN }; // >3 days
 }
 
-function isValidCoordinate(value) {
-  return value !== null && value !== undefined && !Number.isNaN(Number(value));
+function formatDate(date) {
+  if (!date) return "-";
+  return date.toISOString().slice(0, 10);
+}
+
+// DOM references
+const metricTotal = document.getElementById("metric-total");
+const metricToday = document.getElementById("metric-today");
+const metricTomorrow = document.getElementById("metric-tomorrow");
+const metricAfter = document.getElementById("metric-after");
+const dueList = document.getElementById("due-list");
+
+// Fetch data.json produced by Python script (or any compatible API)
+fetch("data.json")
+  .then((res) => res.json())
+  .then((sites) => {
+    renderDashboard(sites);
+  })
+  .catch((err) => {
+    console.error("Failed to load data.json", err);
+  });
+
+function renderDashboard(sites) {
+  const markers = [];
+  const urgentMarkers = [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let countTotal = 0;
+  let countToday = 0;
+  let countTomorrow = 0;
+  let countAfter = 0;
+
+  const dueSites = [];
+
+  sites.forEach((site) => {
+    const lat = parseFloat(site.lat);
+    const lng = parseFloat(site.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const date = parseDate(site.NextFuelingPlan);
+    const days = daysDiffFromToday(date);
+    const { status, color } = getStatus(days);
+
+    if (date) countTotal += 1;
+
+    // Counters
+    if (days === 0) countToday += 1;
+    else if (days === 1) countTomorrow += 1;
+    else if (days === 2) countAfter += 1;
+
+    // Build marker
+    const marker = L.circleMarker([lat, lng], {
+      radius: 8,
+      color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.85,
+    }).addTo(map);
+
+    const popupHtml = `
+      <div style="font-size:12px;">
+        <strong>${site.SiteName || "-"}</strong><br />
+        ${site.CityName || "-"}<br />
+        Fuel date: ${formatDate(date)}<br />
+        Days remaining: ${days !== null ? days : "N/A"}
+      </div>
+    `;
+    marker.bindPopup(popupHtml);
+
+    markers.push({ layer: marker, status, days });
+
+    if (status === "due" || status === "warning") {
+      urgentMarkers.push(marker);
+    }
+
+    if (status === "due") {
+      dueSites.push({
+        ...site,
+        date,
+        days,
+      });
+    }
+  });
+
+  // Update metrics
+  metricTotal.textContent = countTotal;
+  metricToday.textContent = countToday;
+  metricTomorrow.textContent = countTomorrow;
+  metricAfter.textContent = countAfter;
+
+  // Auto-zoom to urgent sites if they exist, otherwise all markers
+  if (urgentMarkers.length > 0) {
+    const group = L.featureGroup(urgentMarkers);
+    map.fitBounds(group.getBounds().pad(0.3));
+  } else if (markers.length > 0) {
+    const group = L.featureGroup(markers.map((m) => m.layer));
+    map.fitBounds(group.getBounds().pad(0.3));
+  }
+
+  // Populate "Today & Due" list (sorted by date asc)
+  dueSites.sort((a, b) => a.date - b.date);
+  dueList.innerHTML = "";
+
+  if (dueSites.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No today / overdue sites. All good!";
+    li.style.fontSize = "0.85rem";
+    li.style.color = "#6b7280";
+    dueList.appendChild(li);
+    return;
+  }
+
+  dueSites.forEach((site) => {
+    const li = document.createElement("li");
+    li.className = "site-item";
+
+    const header = document.createElement("div");
+    header.className = "site-header";
+
+    const left = document.createElement("div");
+    const nameEl = document.createElement("div");
+    nameEl.className = "site-name";
+    nameEl.textContent = site.SiteName || "-";
+
+    const cityEl = document.createElement("div");
+    cityEl.className = "site-city";
+    cityEl.textContent = site.CityName || "-";
+
+    left.appendChild(nameEl);
+    left.appendChild(cityEl);
+
+    const badge = document.createElement("div");
+    badge.className = "site-badge badge-red";
+    badge.textContent = site.days <= 0 ? "DUE" : "TODAY";
+
+    header.appendChild(left);
+    header.appendChild(badge);
+
+    const dateRow = document.createElement("div");
+    dateRow.className = "site-date";
+    dateRow.textContent = `Fuel date: ${formatDate(site.date)} (days diff: ${site.days})`;
+
+    li.appendChild(header);
+    li.appendChild(dateRow);
+
+    dueList.appendChild(li);
+  });
 }
