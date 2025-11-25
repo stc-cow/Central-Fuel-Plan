@@ -17,60 +17,48 @@
 </head>
 <body>
   <div class="dashboard">
-
-    <!-- Top header with cards + ACES logo -->
-    <header class="dashboard-header">
-      <div class="header-row">
-        <div class="metric-cards">
-          <div class="metric-card">
-            <div class="metric-label">Total Sites With Date</div>
-            <div id="metric-total" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Fuel Needed Today</div>
-            <div id="metric-today" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Tomorrow</div>
-            <div id="metric-tomorrow" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">After Tomorrow</div>
-            <div id="metric-after" class="metric-value">0</div>
-          </div>
+    <header class="summary-panel">
+      <div class="summary-header">
+        <h1>Total Central sites</h1>
+        <p>Fueling schedule overview</p>
+      </div>
+      <div class="summary-metrics">
+        <div class="summary-metric">
+          <span>Due and today fueling</span>
+          <strong id="metric-due">0</strong>
         </div>
+        <div class="summary-metric">
+          <span>Tomorrow sites need fueling</span>
+          <strong id="metric-tomorrow">0</strong>
+        </div>
+        <div class="summary-metric">
+          <span>After tomorrow sites need fuel</span>
+          <strong id="metric-after">0</strong>
+        </div>
+      </div>
 
-        <!-- ACES logo centered under the cards on desktop, stacked on mobile -->
-        <div class="aces-logo-wrapper">
-          <img src="assets/aces-logo.png" alt="ACES Managed Services" class="aces-logo" />
+      <div class="table-card">
+        <div class="table-header">
+          <span>Site Name</span>
+          <span>Fueling date</span>
+        </div>
+        <ul id="due-list" class="site-list"></ul>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item legend-due">
+          <span class="legend-dot"></span>
+          <span>Due</span>
+        </div>
+        <div class="legend-item legend-safe">
+          <span class="legend-dot"></span>
+          <span>Fueling date</span>
         </div>
       </div>
     </header>
 
-    <!-- Main content: Map + side list -->
-    <main class="dashboard-main">
+    <main class="map-panel">
       <div id="map"></div>
-
-      <aside class="side-panel">
-        <h2>Today & Due Sites</h2>
-        <p class="side-panel-subtitle">
-          Sites with fuel date today or already overdue.
-        </p>
-        <ul id="due-list" class="site-list"></ul>
-
-        <div class="legend">
-          <h3>Fuel Status Legend</h3>
-          <div class="legend-item">
-            <span class="legend-dot legend-green"></span> &gt; 3 days remaining (Safe)
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot legend-yellow"></span> 1–3 days remaining (Warning)
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot legend-red"></span> Today / overdue (Due)
-          </div>
-        </div>
-      </aside>
     </main>
   </div>
 

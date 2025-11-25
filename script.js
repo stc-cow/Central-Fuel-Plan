@@ -16,9 +16,9 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 12,
 }).addTo(map);
 
-const COLOR_GREEN = "#1bbf72";
+const COLOR_GREEN = "#3ad17c";
 const COLOR_YELLOW = "#ffc857";
-const COLOR_RED = "#ff4b4b";
+const COLOR_RED = "#fb6d5d";
 
 // Helpers
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,12 +47,15 @@ function getStatus(days) {
 
 function formatDate(date) {
   if (!date) return "-";
-  return date.toISOString().slice(0, 10);
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 // DOM references
-const metricTotal = document.getElementById("metric-total");
-const metricToday = document.getElementById("metric-today");
+const metricDue = document.getElementById("metric-due");
 const metricTomorrow = document.getElementById("metric-tomorrow");
 const metricAfter = document.getElementById("metric-after");
 const dueList = document.getElementById("due-list");
@@ -74,8 +77,7 @@ function renderDashboard(sites) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  let countTotal = 0;
-  let countToday = 0;
+  let countDue = 0;
   let countTomorrow = 0;
   let countAfter = 0;
 
@@ -90,12 +92,11 @@ function renderDashboard(sites) {
     const days = daysDiffFromToday(date);
     const { status, color } = getStatus(days);
 
-    if (date) countTotal += 1;
-
-    // Counters
-    if (days === 0) countToday += 1;
-    else if (days === 1) countTomorrow += 1;
-    else if (days === 2) countAfter += 1;
+    if (days !== null) {
+      if (days <= 0) countDue += 1;
+      else if (days === 1) countTomorrow += 1;
+      else if (days >= 2) countAfter += 1;
+    }
 
     // Build marker
     const marker = L.circleMarker([lat, lng], {
@@ -132,8 +133,7 @@ function renderDashboard(sites) {
   });
 
   // Update metrics
-  metricTotal.textContent = countTotal;
-  metricToday.textContent = countToday;
+  metricDue.textContent = countDue;
   metricTomorrow.textContent = countTomorrow;
   metricAfter.textContent = countAfter;
 
@@ -163,34 +163,20 @@ function renderDashboard(sites) {
     const li = document.createElement("li");
     li.className = "site-item";
 
-    const header = document.createElement("div");
-    header.className = "site-header";
-
-    const left = document.createElement("div");
     const nameEl = document.createElement("div");
     nameEl.className = "site-name";
     nameEl.textContent = site.SiteName || "-";
 
-    const cityEl = document.createElement("div");
-    cityEl.className = "site-city";
-    cityEl.textContent = site.CityName || "-";
+    const dateEl = document.createElement("div");
+    dateEl.className = "site-date";
+    dateEl.textContent = formatDate(site.date);
 
-    left.appendChild(nameEl);
-    left.appendChild(cityEl);
+    if (site.days <= 0) {
+      li.classList.add("site-due");
+    }
 
-    const badge = document.createElement("div");
-    badge.className = "site-badge badge-red";
-    badge.textContent = site.days <= 0 ? "DUE" : "TODAY";
-
-    header.appendChild(left);
-    header.appendChild(badge);
-
-    const dateRow = document.createElement("div");
-    dateRow.className = "site-date";
-    dateRow.textContent = `Fuel date: ${formatDate(site.date)} (days diff: ${site.days})`;
-
-    li.appendChild(header);
-    li.appendChild(dateRow);
+    li.appendChild(nameEl);
+    li.appendChild(dateEl);
 
     dueList.appendChild(li);
   });
