@@ -150,7 +150,7 @@ function renderSites(sites) {
 }
 
 //-------------------------------------------------------------
-// FETCH LIVE FROM GOOGLE SHEET API (CLEAN + FIXED)
+// FETCH LIVE FROM GOOGLE APPS SCRIPT JSON API
 //-------------------------------------------------------------
 async function fetchAndRender() {
   try {
@@ -159,32 +159,37 @@ async function fetchAndRender() {
     const response = await fetch(DATA_URL);
     const json = await response.json();
 
-    console.log("RAW API DATA:", json);
+    // The real data is inside json.files[0].data
+    const raw = json?.files?.[0]?.data;
 
-    // Match field names exactly from Apps Script output
-    const sites = json
+    if (!raw || !Array.isArray(raw)) {
+      throw new Error("Invalid JSON structure");
+    }
+
+    const sites = raw
       .filter(
         (s) =>
-          (s.RegionName || s.regionName || "").toLowerCase() === "central"
+          s.RegionName?.toLowerCase() === "central" &&
+          ["ON-AIR", "IN PROGRESS", "IN-PROGRESS"].includes(
+            s.COWStatus?.toUpperCase()
+          )
       )
       .map((s) => ({
-        siteName: s.siteName || s.SiteName,
+        siteName: s.siteName,
         lat: parseFloat(s.lat),
         lng: parseFloat(s.lng),
         fuelDate: parseDate(s.NextFuelingPlan),
-      }))
-      .filter((s) => !isNaN(s.lat) && !isNaN(s.lng));
-
-    console.log("FILTERED SITES:", sites);
+      }));
 
     renderSites(sites);
   } catch (err) {
-    console.error("Failed to load:", err);
+    console.error(err);
     errorBanner.classList.remove("hidden");
+    errorBanner.textContent = "Failed to load data.";
   } finally {
     toggleLoading(false);
   }
 }
 
-// Start dashboard
 fetchAndRender();
+
