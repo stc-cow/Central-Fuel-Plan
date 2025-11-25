@@ -1,16 +1,7 @@
 //-------------------------------------------------------------
-// CONFIG
+// CONFIG  (NOW USING data.json INSTEAD OF GOOGLE SHEET)
 //-------------------------------------------------------------
-const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0GkXnQMdKYZITuuMsAzeWDtGUqEJ3lWwqNdA67NewOsDOgqsZHKHECEEkea4nrukx4-DqxKmf62nC/pub?gid=1149576218&single=true&output=csv";
-
-const COL = {
-  siteName: 1,     // Column B
-  region: 3,       // Column D
-  lat: 11,         // Column L
-  lng: 12,         // Column M
-  fuelDate: 35,    // Column AJ
-};
+const DATA_URL = "data.json"; // <<< FIXED: avoid CORS issues
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -21,6 +12,9 @@ const COLOR = {
   HEALTHY: "#3ad17c",
 };
 
+//-------------------------------------------------------------
+// MAP INIT
+//-------------------------------------------------------------
 const map = L.map("map", {
   maxBounds: [
     [16.0, 34.0],
@@ -30,7 +24,6 @@ const map = L.map("map", {
   minZoom: 4,
 }).setView([23.8859, 45.0792], 6);
 
-// Satellite tiles
 L.tileLayer(
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   {
@@ -40,61 +33,27 @@ L.tileLayer(
 
 const markerLayer = L.layerGroup().addTo(map);
 
-// Metrics
+//-------------------------------------------------------------
+// DOM ELEMENTS
+//-------------------------------------------------------------
 const metricTotal = document.getElementById("metric-total");
 const metricDue = document.getElementById("metric-due");
 const metricTomorrow = document.getElementById("metric-tomorrow");
 const metricAfter = document.getElementById("metric-after");
-
 const dueList = document.getElementById("due-list");
 const loader = document.getElementById("loader");
 const errorBanner = document.getElementById("error");
 
-function toggleLoading(flag) {
-  loader.classList.toggle("hidden", !flag);
+function toggleLoading(state) {
+  loader.classList.toggle("hidden", !state);
 }
 
 //-------------------------------------------------------------
 // HELPERS
 //-------------------------------------------------------------
-function parseCsv(text) {
-  return text
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => splitCsvLine(line));
-}
-
-function splitCsvLine(line) {
-  let cells = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    let char = line[i];
-
-    if (char === '"') {
-      const next = line[i + 1];
-      if (inQuotes && next === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      cells.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  cells.push(current);
-  return cells;
-}
-
-function parseDate(d) {
-  if (!d) return null;
-  const dt = new Date(d);
+function parseDate(str) {
+  if (!str) return null;
+  const dt = new Date(str);
   if (isNaN(dt)) return null;
   dt.setHours(0, 0, 0, 0);
   return dt;
@@ -109,16 +68,13 @@ function formatDate(dt) {
   });
 }
 
-function dateDiffFromToday(dt) {
+function dateDiff(dt) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (!dt) return null;
   return Math.round((dt - today) / ONE_DAY);
 }
 
-//-------------------------------------------------------------
-// STATUS LOGIC
-//-------------------------------------------------------------
 function getStatus(days) {
   if (days === null) return { label: "unknown", color: COLOR.HEALTHY };
   if (days <= 0) return { label: "due", color: COLOR.DUE };
@@ -128,7 +84,7 @@ function getStatus(days) {
 }
 
 //-------------------------------------------------------------
-// RENDER MAP + METRICS
+// RENDER FUNCTION
 //-------------------------------------------------------------
 function renderSites(sites) {
   markerLayer.clearLayers();
@@ -142,7 +98,7 @@ function renderSites(sites) {
   let priorityMarkers = [];
 
   sites.forEach((s) => {
-    const days = dateDiffFromToday(s.fuelDate);
+    const days = dateDiff(s.fuelDate);
     const { label, color } = getStatus(days);
 
     if (days !== null) {
@@ -175,14 +131,14 @@ function renderSites(sites) {
   metricTomorrow.textContent = countTomorrow;
   metricAfter.textContent = countAfter;
 
-  // Auto zoom
+  // Zoom behavior
   if (priorityMarkers.length > 0) {
     map.fitBounds(L.featureGroup(priorityMarkers).getBounds().pad(0.4));
   } else if (markers.length > 0) {
     map.fitBounds(L.featureGroup(markers).getBounds().pad(0.3));
   }
 
-  // Populate due table
+  // Due List
   dueList.innerHTML = "";
   if (dueSites.length === 0) {
     dueList.innerHTML = `<li class="empty-row">No sites due today.</li>`;
@@ -200,38 +156,23 @@ function renderSites(sites) {
 }
 
 //-------------------------------------------------------------
-// FETCH + MAIN LOGIC
+// FETCH FROM data.json INSTEAD OF GOOGLE SHEET
 //-------------------------------------------------------------
 async function fetchAndRender() {
   try {
     toggleLoading(true);
 
-    const response = await fetch(SHEET_URL);
-    const text = await response.text();
-    const rows = parseCsv(text);
+    const response = await fetch(DATA_URL);
+    if (!response.ok) throw new Error("Failed to fetch data.json");
 
-    const sites = [];
+    const json = await response.json();
 
-    rows.forEach((row, i) => {
-      if (i === 0) return; // Skip header
-
-      const region = (row[COL.region] || "").trim().toLowerCase();
-      if (region !== "central") return;
-
-      const fuelDate = parseDate(row[COL.fuelDate]);
-      if (!fuelDate) return; // Exclude non-date AJ
-
-      const lat = parseFloat(row[COL.lat]);
-      const lng = parseFloat(row[COL.lng]);
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      sites.push({
-        siteName: row[COL.siteName],
-        lat,
-        lng,
-        fuelDate,
-      });
-    });
+    const sites = json.map((item) => ({
+      siteName: item.SiteName,
+      lat: parseFloat(item.lat),
+      lng: parseFloat(item.lng),
+      fuelDate: parseDate(item.NextFuelingPlan),
+    }));
 
     renderSites(sites);
   } catch (err) {
