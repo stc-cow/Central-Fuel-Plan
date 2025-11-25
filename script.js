@@ -1,7 +1,7 @@
 //-------------------------------------------------------------
-// CONFIG  (NOW USING data.json INSTEAD OF GOOGLE SHEET)
+// CONFIG
 //-------------------------------------------------------------
-const DATA_URL = "data.json"; // <<< FIXED: avoid CORS issues
+const DATA_URL = "data.json";
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -13,7 +13,7 @@ const COLOR = {
 };
 
 //-------------------------------------------------------------
-// MAP INIT
+// MAP
 //-------------------------------------------------------------
 const map = L.map("map", {
   maxBounds: [
@@ -40,6 +40,7 @@ const metricTotal = document.getElementById("metric-total");
 const metricDue = document.getElementById("metric-due");
 const metricTomorrow = document.getElementById("metric-tomorrow");
 const metricAfter = document.getElementById("metric-after");
+
 const dueList = document.getElementById("due-list");
 const loader = document.getElementById("loader");
 const errorBanner = document.getElementById("error");
@@ -53,10 +54,24 @@ function toggleLoading(state) {
 //-------------------------------------------------------------
 function parseDate(str) {
   if (!str) return null;
+
+  // If no year → append current year
+  if (/^\d{1,2}-[A-Za-z]{3}$/i.test(str)) {
+    const currentYear = new Date().getFullYear();
+    str = `${str}-${currentYear}`;
+  }
+
   const dt = new Date(str);
   if (isNaN(dt)) return null;
   dt.setHours(0, 0, 0, 0);
   return dt;
+}
+
+function dateDiff(dt) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (!dt) return null;
+  return Math.round((dt - today) / ONE_DAY);
 }
 
 function formatDate(dt) {
@@ -68,13 +83,6 @@ function formatDate(dt) {
   });
 }
 
-function dateDiff(dt) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (!dt) return null;
-  return Math.round((dt - today) / ONE_DAY);
-}
-
 function getStatus(days) {
   if (days === null) return { label: "unknown", color: COLOR.HEALTHY };
   if (days <= 0) return { label: "due", color: COLOR.DUE };
@@ -84,7 +92,7 @@ function getStatus(days) {
 }
 
 //-------------------------------------------------------------
-// RENDER FUNCTION
+// RENDER
 //-------------------------------------------------------------
 function renderSites(sites) {
   markerLayer.clearLayers();
@@ -93,9 +101,9 @@ function renderSites(sites) {
   let countTomorrow = 0;
   let countAfter = 0;
 
-  let dueSites = [];
-  let markers = [];
-  let priorityMarkers = [];
+  const dueSites = [];
+  const markers = [];
+  const priority = [];
 
   sites.forEach((s) => {
     const days = dateDiff(s.fuelDate);
@@ -117,54 +125,46 @@ function renderSites(sites) {
       weight: 2,
     }).addTo(markerLayer);
 
-    marker.bindPopup(
-      `<b>${s.siteName}</b><br>${formatDate(s.fuelDate)}`
-    );
-
     markers.push(marker);
-    if (label === "due") priorityMarkers.push(marker);
+    if (label === "due") priority.push(marker);
   });
 
-  // Update metrics
+  // UPDATE METRICS
   metricTotal.textContent = sites.length;
   metricDue.textContent = countDue;
   metricTomorrow.textContent = countTomorrow;
   metricAfter.textContent = countAfter;
 
-  // Zoom behavior
-  if (priorityMarkers.length > 0) {
-    map.fitBounds(L.featureGroup(priorityMarkers).getBounds().pad(0.4));
+  // AUTO ZOOM
+  if (priority.length > 0) {
+    map.fitBounds(L.featureGroup(priority).getBounds().pad(0.4));
   } else if (markers.length > 0) {
     map.fitBounds(L.featureGroup(markers).getBounds().pad(0.3));
   }
 
-  // Due List
+  // POPULATE DUE LIST
   dueList.innerHTML = "";
   if (dueSites.length === 0) {
     dueList.innerHTML = `<li class="empty-row">No sites due today.</li>`;
   } else {
     dueSites.forEach((s) => {
-      const li = document.createElement("li");
-      li.className = "site-item";
-      li.innerHTML = `
-        <div class="site-name">${s.siteName}</div>
-        <div class="site-date">${formatDate(s.fuelDate)}</div>
-      `;
-      dueList.appendChild(li);
+      dueList.innerHTML += `
+        <li class="site-item">
+          <div class="site-name">${s.siteName}</div>
+          <div class="site-date">${formatDate(s.fuelDate)}</div>
+        </li>`;
     });
   }
 }
 
 //-------------------------------------------------------------
-// FETCH FROM data.json INSTEAD OF GOOGLE SHEET
+// FETCH FROM data.json
 //-------------------------------------------------------------
 async function fetchAndRender() {
   try {
     toggleLoading(true);
 
     const response = await fetch(DATA_URL);
-    if (!response.ok) throw new Error("Failed to fetch data.json");
-
     const json = await response.json();
 
     const sites = json.map((item) => ({
@@ -175,10 +175,11 @@ async function fetchAndRender() {
     }));
 
     renderSites(sites);
+
   } catch (err) {
     console.error(err);
-    errorBanner.textContent = "Failed to load data.";
     errorBanner.classList.remove("hidden");
+    errorBanner.textContent = "Failed to load data.";
   } finally {
     toggleLoading(false);
   }
