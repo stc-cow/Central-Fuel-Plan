@@ -1,205 +1,90 @@
-:root {
-  --bg: #08152b;
-  --card: rgba(10, 28, 51, 0.85);
-  --border: rgba(255, 255, 255, 0.08);
-  --text: #f3f5f9;
-  --muted: #9fb2c9;
-  --accent: #00c2ff;
-  --due: #fb6d5d;
-  --safe: #3ad17c;
-  --radius: 18px;
-  --shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Central Fuel Plan Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+</head>
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+<body>
+  <div class="dashboard">
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at 20% 20%, #0d2748, var(--bg) 45%);
-  color: var(--text);
-  min-height: 100vh;
-}
+    <!-- LEFT SUMMARY PANEL -->
+    <div class="summary-panel">
 
-.dashboard {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 18px;
-  padding: 18px 18px 22px;
-  height: 100vh;
-}
+      <div class="summary-header">
+        <h1>Central Region Fueling Status</h1>
+        <p>Live updates from Google Sheet</p>
+      </div>
 
-.summary-panel {
-  background: linear-gradient(160deg, rgba(12, 40, 72, 0.95), rgba(7, 21, 43, 0.95));
-  border-radius: 28px;
-  border: 1px solid var(--border);
-  padding: 22px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
+      <div class="summary-metrics">
+        <div class="summary-metric">
+          <span>Total Sites</span>
+          <strong id="metric-total">0</strong>
+        </div>
 
-.summary-header h1 {
-  margin: 0;
-  font-size: 1.1rem;
-  letter-spacing: 0.02em;
-}
+        <div class="summary-metric">
+          <span>Due / Today</span>
+          <strong id="metric-due">0</strong>
+        </div>
 
-.summary-header p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
+        <div class="summary-metric">
+          <span>Tomorrow</span>
+          <strong id="metric-tomorrow">0</strong>
+        </div>
 
-.summary-metrics {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
+        <div class="summary-metric">
+          <span>After Tomorrow</span>
+          <strong id="metric-after">0</strong>
+        </div>
+      </div>
 
-.summary-metric {
-  background: rgba(13, 31, 57, 0.9);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-}
+      <!-- DUE LIST -->
+      <div class="table-card">
+        <div class="table-header">
+          <div>Site Name</div>
+          <div>Fueling Date</div>
+        </div>
 
-.summary-metric strong {
-  color: var(--text);
-  font-size: 1.7rem;
-  letter-spacing: 0.02em;
-}
+        <ul class="site-list" id="due-list"></ul>
+      </div>
 
-.table-card {
-  background: rgba(10, 24, 46, 0.9);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
+      <!-- LEGEND -->
+      <div class="legend">
+        <div class="legend-item legend-due">
+          <span class="legend-dot"></span> Due / Today
+        </div>
 
-.table-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
+        <div class="legend-item legend-safe">
+          <span class="legend-dot" style="background:#ffc857;"></span> Tomorrow
+        </div>
 
-.site-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 48vh;
-  overflow-y: auto;
-}
+        <div class="legend-item legend-safe">
+          <span class="legend-dot" style="background:#ff9f1c;"></span> After Tomorrow
+        </div>
 
-.site-item {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 12px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.03);
-  color: var(--text);
-  align-items: center;
-}
+        <div class="legend-item legend-safe">
+          <span class="legend-dot"></span> Healthy
+        </div>
+      </div>
 
-.site-name {
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
+      <div id="loader" class="muted" style="margin-top:10px;">Loading…</div>
+      <div id="error" class="muted hidden" style="color:#fb6d5d; margin-top:6px;">Failed to load data.</div>
 
-.site-date {
-  text-align: right;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
+    </div>
 
-.site-due .site-name {
-  color: var(--due);
-}
+    <!-- RIGHT MAP PANEL -->
+    <div class="map-panel">
+      <div id="map"></div>
+    </div>
 
-.legend {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding-top: 4px;
-}
+  </div>
 
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.legend-due .legend-dot {
-  background: var(--due);
-}
-
-.legend-safe .legend-dot {
-  background: var(--safe);
-}
-
-.map-panel {
-  position: relative;
-  border-radius: 28px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-
-#map {
-  width: 100%;
-  height: 100%;
-}
-
-@media (max-width: 1080px) {
-  .dashboard {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-
-  .map-panel {
-    height: 60vh;
-  }
-}
-
-@media (max-width: 640px) {
-  .summary-panel {
-    padding: 18px;
-  }
-
-  .summary-metric {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .site-item {
-    grid-template-columns: 1fr;
-    row-gap: 6px;
-  }
-
-  .site-date {
-    text-align: left;
-  }
-}
+  <script src="script.js"></script>
+</body>
+</html>
