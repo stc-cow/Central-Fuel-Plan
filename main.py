@@ -15,6 +15,37 @@ SHEET_URL = (
 
 
 # -------------------------------------------------------
+# DATE PARSER (New)
+# -------------------------------------------------------
+def safe_parse_date(value: str):
+    """Return a valid date or None if not a valid date."""
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    formats = [
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%m/%d/%Y",
+        "%d/%m/%y",
+        "%b %d %Y",
+        "%d %b %Y",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(value, fmt)
+        except Exception:
+            continue
+
+    return None
+
+
+# -------------------------------------------------------
 # LOAD DATA (Google Sheet)
 # -------------------------------------------------------
 def load_data() -> pd.DataFrame:
@@ -90,9 +121,21 @@ def clean_and_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
         df["nextfuelingplan"] = pd.NaT
         date_col = "nextfuelingplan"
 
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-    df = df.dropna(subset=[date_col])
+    # -----------------------------------------------------------
+    # NEW: Exclude all non-date values from AJ column
+    # -----------------------------------------------------------
+    print("[INFO] Cleaning date column and removing non-date values...")
+    df["__parsed_date"] = df[date_col].apply(safe_parse_date)
+    df = df.dropna(subset=["__parsed_date"])
+    df["NextFuelingParsed"] = pd.to_datetime(df["__parsed_date"]).dt.date
+    df = df.drop(columns=["__parsed_date"])
+    # Now the date column is guaranteed to contain only valid dates
+    df[date_col] = pd.to_datetime(df["NextFuelingParsed"])
+    df = df.drop(columns=["NextFuelingParsed"])
 
+    # -----------------------------------------------------------
+
+    # Filter by Region = Central
     if region_col:
         mask = df[region_col].astype(str).str.strip().str.lower() == "central"
         df = df.loc[mask]
@@ -196,3 +239,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
