@@ -31,12 +31,9 @@ L.tileLayer(
   }
 ).addTo(map);
 
-const markerLayer = L.layerGroup().addTo(map);
-
-const COLOR_GREEN = "#2fd470";
-const COLOR_YELLOW = "#ffd447";
-const COLOR_ORANGE = "#ffa047";
-const COLOR_RED = "#ff5f56";
+const COLOR_GREEN = "#3ad17c";
+const COLOR_YELLOW = "#ffc857";
+const COLOR_RED = "#fb6d5d";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -104,21 +101,11 @@ function parseCsv(text) {
 
 function parseDate(value) {
   if (!value) return null;
-
-  const trimmed = value.trim();
-  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-
-  if (isoMatch) {
-    const [, y, m, d] = isoMatch.map(Number);
-    return new Date(y, m - 1, d, 0, 0, 0, 0);
-  }
-
-  const parsed = new Date(trimmed);
+  const parsed = new Date(value);
   if (!Number.isNaN(parsed.getTime())) {
     parsed.setHours(0, 0, 0, 0);
     return parsed;
   }
-
   return null;
 }
 
@@ -137,38 +124,20 @@ function getStatus(days) {
   return { status: "healthy", color: COLOR_GREEN };
 }
 
-function buildSites(rows) {
-  if (rows.length === 0) return [];
-  const hasHeader = rows[0]?.[COLUMN_INDEX.siteName]
-    ?.toLowerCase?.()
-    ?.includes("site");
-  const dataRows = hasHeader ? rows.slice(1) : rows;
-
-  return dataRows
-    .map((row) => {
-      const siteName = row[COLUMN_INDEX.siteName]?.trim();
-      const regionName = row[COLUMN_INDEX.regionName]?.trim();
-      const lat = parseFloat(row[COLUMN_INDEX.latitude]);
-      const lng = parseFloat(row[COLUMN_INDEX.longitude]);
-      const nextFuelRaw = row[COLUMN_INDEX.nextFuelDate]?.trim();
-      return {
-        siteName,
-        regionName,
-        lat,
-        lng,
-        nextFuelDate: parseDate(nextFuelRaw),
-        nextFuelRaw,
-      };
-    })
-    .filter((row) => row.regionName === "Central" && !Number.isNaN(row.lat) && !Number.isNaN(row.lng));
+function formatDate(date) {
+  if (!date) return "-";
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-function updateCounters(summary) {
-  metricTotal.textContent = summary.total;
-  metricDue.textContent = summary.due;
-  metricTomorrow.textContent = summary.tomorrow;
-  metricAfter.textContent = summary.after;
-}
+// DOM references
+const metricDue = document.getElementById("metric-due");
+const metricTomorrow = document.getElementById("metric-tomorrow");
+const metricAfter = document.getElementById("metric-after");
+const dueList = document.getElementById("due-list");
 
 function populateDueTable(dueSites) {
   dueList.innerHTML = "";
@@ -185,9 +154,9 @@ function populateDueTable(dueSites) {
     const li = document.createElement("li");
     li.className = "site-item";
 
-    const nameEl = document.createElement("div");
-    nameEl.className = "site-name";
-    nameEl.textContent = site.siteName || "-";
+  let countDue = 0;
+  let countTomorrow = 0;
+  let countAfter = 0;
 
     const dateEl = document.createElement("div");
     dateEl.className = "site-date";
@@ -200,14 +169,11 @@ function populateDueTable(dueSites) {
   });
 }
 
-function renderMapMarkers(sites) {
-  markerLayer.clearLayers();
-  const allMarkers = [];
-  const priorityMarkers = [];
-
-  sites.forEach((site) => {
-    const days = daysDiffFromToday(site.nextFuelDate);
-    const { status, color } = getStatus(days);
+    if (days !== null) {
+      if (days <= 0) countDue += 1;
+      else if (days === 1) countTomorrow += 1;
+      else if (days >= 2) countAfter += 1;
+    }
 
     const marker = L.circleMarker([site.lat, site.lng], {
       radius: 8,
@@ -217,11 +183,10 @@ function renderMapMarkers(sites) {
       fillOpacity: 0.85,
     }).addTo(markerLayer);
 
-    marker.bindPopup(
-      `<div class="popup"><strong>${site.siteName || "-"}</strong><br/>Fuel date: ${formatDate(
-        site.nextFuelDate
-      )}<br/>Status: ${status}</div>`
-    );
+  // Update metrics
+  metricDue.textContent = countDue;
+  metricTomorrow.textContent = countTomorrow;
+  metricAfter.textContent = countAfter;
 
     allMarkers.push(marker);
     if (status === "due") priorityMarkers.push(marker);
@@ -239,71 +204,20 @@ function renderMapMarkers(sites) {
   }
 }
 
-function summarizeSites(sites) {
-  const summary = {
-    total: sites.length,
-    due: 0,
-    tomorrow: 0,
-    after: 0,
-  };
+    const nameEl = document.createElement("div");
+    nameEl.className = "site-name";
+    nameEl.textContent = site.SiteName || "-";
 
-  const dueSites = [];
+    const dateEl = document.createElement("div");
+    dateEl.className = "site-date";
+    dateEl.textContent = formatDate(site.date);
 
-  sites.forEach((site) => {
-    const days = daysDiffFromToday(site.nextFuelDate);
-    if (days === null) return;
-
-    if (days <= 0) {
-      summary.due += 1;
-      dueSites.push(site);
-    } else if (days === 1) {
-      summary.tomorrow += 1;
-    } else if (days === 2) {
-      summary.after += 1;
+    if (site.days <= 0) {
+      li.classList.add("site-due");
     }
-  });
 
-  dueSites.sort((a, b) => (a.nextFuelDate || 0) - (b.nextFuelDate || 0));
-  return { summary, dueSites };
-}
-
-function setUpdatedTimestamp() {
-  const now = new Date();
-  lastUpdated.textContent = `Updated ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-}
-
-async function fetchAndRender() {
-  toggleLoading(true);
-  errorBanner.classList.add("hidden");
-
-  try {
-    const response = await fetch(SHEET_URL, { cache: "no-cache" });
-    if (!response.ok) throw new Error("Network response was not ok");
-    const csvText = await response.text();
-    const rows = parseCsv(csvText);
-    const sites = buildSites(rows);
-
-    const { summary, dueSites } = summarizeSites(sites);
-    updateCounters(summary);
-    populateDueTable(dueSites);
-    renderMapMarkers(sites);
-    setUpdatedTimestamp();
-  } catch (err) {
-    console.error("Failed to load sheet", err);
-    errorBanner.classList.remove("hidden");
-    updateCounters({ total: 0, due: 0, tomorrow: 0, after: 0 });
-    populateDueTable([]);
-  } finally {
-    toggleLoading(false);
-  }
-}
-
-function startAutoRefresh() {
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(fetchAndRender, REFRESH_INTERVAL_MS);
-}
-
-refreshBtn.addEventListener("click", fetchAndRender);
+    li.appendChild(nameEl);
+    li.appendChild(dateEl);
 
 fetchAndRender();
 startAutoRefresh();
