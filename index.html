@@ -17,61 +17,61 @@
 </head>
 <body>
   <div class="dashboard">
-
-    <!-- Top header with cards + ACES logo -->
-    <header class="dashboard-header">
-      <div class="header-row">
-        <div class="metric-cards">
-          <div class="metric-card">
-            <div class="metric-label">Total Sites With Date</div>
-            <div id="metric-total" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Fuel Needed Today</div>
-            <div id="metric-today" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Tomorrow</div>
-            <div id="metric-tomorrow" class="metric-value">0</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">After Tomorrow</div>
-            <div id="metric-after" class="metric-value">0</div>
-          </div>
+    <section class="left-panel">
+      <header class="panel-header">
+        <div>
+          <p class="eyebrow">Central Region</p>
+          <h1>Fueling Dashboard</h1>
+          <p class="muted">Live fueling status sourced from the Central Google Sheet.</p>
         </div>
+        <div class="header-actions">
+          <button id="refresh-btn" class="ghost-btn">Refresh Now</button>
+          <span id="last-updated" class="timestamp">--</span>
+        </div>
+      </header>
 
-        <!-- ACES logo centered under the cards on desktop, stacked on mobile -->
-        <div class="aces-logo-wrapper">
-          <img src="assets/aces-logo.png" alt="ACES Managed Services" class="aces-logo" />
+      <div class="cards">
+        <div class="card accent">
+          <div class="card-label">Total Central Sites</div>
+          <div class="card-value" id="metric-total">0</div>
+        </div>
+        <div class="card danger">
+          <div class="card-label">Due &amp; Today</div>
+          <div class="card-value" id="metric-due">0</div>
+        </div>
+        <div class="card warning">
+          <div class="card-label">Tomorrow</div>
+          <div class="card-value" id="metric-tomorrow">0</div>
+        </div>
+        <div class="card caution">
+          <div class="card-label">After Tomorrow</div>
+          <div class="card-value" id="metric-after">0</div>
         </div>
       </div>
-    </header>
 
-    <!-- Main content: Map + side list -->
-    <main class="dashboard-main">
-      <div id="map"></div>
-
-      <aside class="side-panel">
-        <h2>Today & Due Sites</h2>
-        <p class="side-panel-subtitle">
-          Sites with fuel date today or already overdue.
-        </p>
-        <ul id="due-list" class="site-list"></ul>
-
-        <div class="legend">
-          <h3>Fuel Status Legend</h3>
-          <div class="legend-item">
-            <span class="legend-dot legend-green"></span> &gt; 3 days remaining (Safe)
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot legend-yellow"></span> 1–3 days remaining (Warning)
-          </div>
-          <div class="legend-item">
-            <span class="legend-dot legend-red"></span> Today / overdue (Due)
-          </div>
+      <div class="table-card">
+        <div class="table-header">
+          <div>Site Name</div>
+          <div>Fuel Date</div>
         </div>
-      </aside>
-    </main>
+        <ul id="due-list" class="site-list"></ul>
+      </div>
+    </section>
+
+    <section class="map-panel">
+      <div class="map-header">
+        <div class="legend">
+          <div class="legend-item legend-red"><span class="legend-dot"></span>Due / Today</div>
+          <div class="legend-item legend-yellow"><span class="legend-dot"></span>Tomorrow</div>
+          <div class="legend-item legend-orange"><span class="legend-dot"></span>After Tomorrow</div>
+          <div class="legend-item legend-green"><span class="legend-dot"></span>Healthy</div>
+        </div>
+        <div class="live-pill">Satellite Map</div>
+      </div>
+      <div id="map"></div>
+      <div id="loader" class="loader hidden">Refreshing data...</div>
+      <div id="error" class="error hidden">Unable to load data. Please try again.</div>
+    </section>
   </div>
 
   <!-- Leaflet JS -->
