@@ -54,45 +54,48 @@ def load_data() -> pd.DataFrame:
 # -------------------------------------------------------
 # CLEAN & FILTER ACCORDING TO PROJECT RULES
 # -------------------------------------------------------
-def clean_and_filter(df):
+def clean_and_filter(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
+    df = df.copy()
+    df.columns = _normalize_columns(df.columns)
 
-    # NORMALIZE COLUMNS
-    df.columns = (
-        pd.Index(df.columns)
-        .astype(str).str.strip().str.lower().str.replace(" ", "")
-    )
+    # Column detection
+    site_col = _pick_column(df, ["b", "sitename", "site", "cowid"])
+    region_col = _pick_column(df, ["d", "region", "regionname"])
+    status_col = _pick_column(df, ["j", "cowstatus", "status"])
+    date_col = _pick_column(df, ["aj", "nextfuelingplan", "nextfueldate"])
+    lat_col = _pick_column(df, ["l", "lat", "latitude"])
+    lng_col = _pick_column(df, ["m", "lng", "lon", "longitude"])
 
-    site_col = "sitename"      # Column B
-    region_col = "regionnam"   # Column D
-    status_col = "cowstatus"   # Column J
-    date_col = "nextfuelingplan" # Column AJ
-    lat_col = "lat"            # Column L
-    lng_col = "lng"            # Column M
+    # Basic cleanup
+    df[site_col] = df[site_col].astype(str).str.strip()
+    df[region_col] = df[region_col].astype(str).str.strip().str.lower()
+    df[status_col] = df[status_col].astype(str).str.strip().str.upper()
 
-    # 1️⃣ Region filter → Central only
-    df = df[df[region_col].str.strip().str.lower() == "central"]
+    # FILTER 1 — Central region
+    df = df[df[region_col] == "central"]
 
-    # 2️⃣ Status filter → ON-AIR or IN PROGRESS
-    df[status_col] = df[status_col].str.upper().str.strip()
+    # FILTER 2 — ON-AIR or IN PROGRESS
     df = df[df[status_col].isin(["ON-AIR", "IN PROGRESS"])]
 
-    # 3️⃣ Clean AJ → remove all invalid entries
-    print("[INFO] Cleaning AJ (NextFuelingPlan)...")
-    df["parsed_date"] = df[date_col].apply(safe_parse_date)
-    df = df.dropna(subset=["parsed_date"])
-    df["parsed_date"] = pd.to_datetime(df["parsed_date"])
+    # FILTER 3 — Clean date column (AJ)
+    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+    df = df.dropna(subset=[date_col])              # keep only valid dates
 
-    # Extract cleaned DF
-    clean = pd.DataFrame({
-        "SiteName": df[site_col],
-        "Region": df[region_col],
-        "COWStatus": df[status_col],
-        "NextFuelingPlan": df["parsed_date"],
-        "lat": df[lat_col],
-        "lng": df[lng_col]
-    })
+    # FILTER 4 — require coordinates
+    has_coordinates = lat_col is not None and lng_col is not None
+    if has_coordinates:
+        df = df.dropna(subset=[lat_col, lng_col])
 
-    return clean
+    # FINAL CLEAN TABLE
+    df_clean = df[[site_col, date_col, lat_col, lng_col]].copy()
+    df_clean.rename(columns={
+        site_col: "SiteName",
+        date_col: "NextFuelingPlan",
+        lat_col: "lat",
+        lng_col: "lng"
+    }, inplace=True)
+
+    return df_clean, has_coordinates
 
 
 # -------------------------------------------------------
